@@ -24,9 +24,6 @@
 #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 #endif
 
-//LCD pins
-Adafruit_PCD8544 display = Adafruit_PCD8544(3, 4, 5, 9, 10);
-
 //Arduino pins
 //D02 - btn
 //D03 - CLK
@@ -48,6 +45,15 @@ const int ain0Pin = 6; //AIN0 pin
 const int ain1Pin = 7; //AIN1 pin
 const int ledPin = 13; //LED pin
 const int beepPin = 11; //beep pin
+const int CLKpin = 3; // PCD Clock
+const int DinPin = 4; // PCD Data in
+const int DCPin = 5; // PCD Data/Clock
+const int CEPin = 9; // PCD Chip Select
+const int RSTPin = 10; // PCD Reset
+
+//LCD pins
+Adafruit_PCD8544 display = Adafruit_PCD8544(CLKPin, DinPin, DCPin, CEPin, RSTPin);
+
 //------------ delays
 const unsigned int PULSE_US = 250; //pulse length, us
 const unsigned int DELAY_US = 5; //delay time, us
@@ -98,9 +104,9 @@ void setup()   {
   //comparator init
   pinMode(ain0Pin, INPUT);//AIN0 -> input
   pinMode(ain1Pin, INPUT);//AIN1 -> input
-  ACSR = 0b00000000;
-  ADCSRA = 0b10000000;
-  ADCSRB = 0b00000000;
+  ACSR = 0b00000000; // Analog Comparator Control and Status Register 
+  ADCSRA = 0b10000000; // ADEN, ADPS = /2
+  ADCSRB = 0b00000000; //
   //zeroing init
   zero_count = ZERO_COUNTS;
   zero = 0;
@@ -148,7 +154,7 @@ void loop()
     noInterrupts();//interrupts disable
     count = 0;
     //pulse
-    PORTB |= 0b00000001; //1
+    PORTB |= 0b00000001; //1 Fastest write to B0/Pin 12/D8
     delayMicroseconds(PULSE_US);
     PORTB &= ~0b00000001; //0
     //delay time
@@ -157,13 +163,13 @@ void loop()
     do
     {
     }
-    while ((ACSR & 0b00100000) != 0);
+    while ((ACSR & 0b00100000) != 0); // ACO Analog Comparator Output
     //hi wait
     do
     {
       count=count+1;
     }
-    while ((ACSR & 0b00100000) == 0);
+    while ((ACSR & 0b00100000) == 0); // ACO Analog Comparator Output
     interrupts();//interrupts enable
 
     //zeroing
