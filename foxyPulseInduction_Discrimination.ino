@@ -71,8 +71,10 @@ const byte TEXT_SIZE_SMALL = 1;//LCD text size (small)
 const byte TEXT_SIZE_BIG = 3;//LCD text size (big)
 
 const int PROTECT = 3;
-const int AVG_COUNTS = 20;
+const int AVG_COUNTS = 20; // reporting interval
 const int ZERO_COUNTS = 4000;
+
+const float alpha = 0.1; // Exponentially weighted moving average weight
 
 //------------ btn
 
@@ -89,7 +91,56 @@ int delta = 0;//diff
 
 // drf5n compile w/o jeelib ISR(WDT_vect) { Sleepy::watchdogEvent(); } // Setup the watchdog
 
+
+
 boolean target = false;
+
+
+void zeroingMessage() {
+    display.clearDisplay();//LCD clear
+    display.display();
+    display.setCursor(0, 0);
+    display.setTextSize(TEXT_SIZE_SMALL);
+    display.println("Zeroing");
+    display.display();
+}
+       
+void displayMeasurement(float count_avg){
+  // report the output  
+  display.clearDisplay();//LCD clear
+  display.display();
+  display.setCursor(0, 0);
+  display.setTextSize(TEXT_SIZE_BIG);
+  display.println(((int) count_avg));
+  display.display();
+}
+
+void displayWelcome(){
+  display.clearDisplay();//LCD clear
+  display.display();
+  //contrast set
+  display.setContrast(CONTRAST);
+  //text color set
+  display.setTextColor(BLACK);
+  //text size set
+  display.setTextSize(TEXT_SIZE_SMALL);
+  //welcome message
+  display.println("FoxyPI v1");
+  display.println("(C) FoxyLab"); 
+  display.display();
+  //blink $ beep 3 times
+  for (i = 0 ; i < BLINK_TIMES ; i++)
+  {
+    digitalWrite(ledPin,HIGH);//LED on
+    analogWrite(beepPin, BEEP_ON);//beep on
+    delay(BLINK_MS);
+    digitalWrite(ledPin,LOW);//LED off
+    analogWrite(beepPin, BEEP_OFF);//beep off
+    delay(BLINK_MS);  
+  }
+}
+
+
 
 void setup()   {
   Serial.begin(9600);
@@ -113,37 +164,12 @@ void setup()   {
   zeroing = true;
   target = false;
   display.begin();//LCD init
-  display.clearDisplay();//LCD clear
-  display.display();
-  //contrast set
-  display.setContrast(CONTRAST);
-  //text color set
-  display.setTextColor(BLACK);
-  //text size set
-  display.setTextSize(TEXT_SIZE_SMALL);
-  //welcome message
-  display.println("FoxyPI v1");
-  display.println("(C) FoxyLab"); 
-  display.display();
-  //blink $ beep 3 times
-  for (i = 0 ; i < BLINK_TIMES ; i++)
-  {
-    digitalWrite(ledPin,HIGH);//LED on
-    analogWrite(beepPin, BEEP_ON);//beep on
-    delay(BLINK_MS);
-    digitalWrite(ledPin,LOW);//LED off
-    analogWrite(beepPin, BEEP_OFF);//beep off
-    delay(BLINK_MS);  
-  }
+  displayWelcome();
   power_adc_disable();//ADC disable
   power_spi_disable();//SPI disable
   power_twi_disable();//Two Wire Interface disable
   power_usart0_disable();//USART0 disable
-  display.clearDisplay();//LCD clear
-  display.display();
-  display.setCursor(0, 0);
-  display.println("Zeroing");
-  display.display();
+  zeroingMessage();
 }
 
 
@@ -179,13 +205,6 @@ void loop()
       }
       zero_count--;//zero counter decrement
       if (zero_count == 0) {
-        //display
-        display.clearDisplay();//LCD clear
-        display.display();
-        display.setCursor(0, 0);
-        display.print("Zero: ");
-        display.println(zero);
-        display.display();
         //beep
         digitalWrite(ledPin,HIGH);//LED on
         analogWrite(beepPin, BEEP_ON);
@@ -197,16 +216,9 @@ void loop()
         count_avg = 0;
       }
       else {
-        display.setCursor(0, 15);
-        //*********
-        for (i = 0 ; i < ( ((float) ((float) (ZERO_COUNTS-zero_count)/ZERO_COUNTS)))*10 ; i++)
-        {
-          display.print("*");  
-        }
-        display.display();
       }
     }
-    else {
+    else { // not zeroing, normal operation instead
       delta = count - zero;
       //target check
       if (count > (zero+PROTECT)) {
@@ -225,17 +237,12 @@ void loop()
         analogWrite(beepPin, BEEP_OFF);//beep off
       }
 
-      //avg calculation
-      count_avg = (count_avg*counter+count)/(++counter);
-      if (counter == AVG_COUNTS) {
+      //EWMA avg calculation
+      count_avg = (1.0-alpha)*count_avg + alpha*count;
+      // Update display
+      if (++counter > AVG_COUNTS) {
         //avg display
-        display.clearDisplay();//LCD clear
-        display.display();
-        display.setCursor(0, 0);
-        display.setTextSize(TEXT_SIZE_BIG);
-        display.println(((int) count_avg));
-        display.display();
-        count_avg = 0;//avg reset
+        displayMeasurement(count_avg);
         counter = 0;//counter reset
             
       }
@@ -258,14 +265,10 @@ void loop()
       zero = 0;
       zeroing = true;
       target = false;
-      display.clearDisplay();//LCD clear
-      display.display();
-      display.setCursor(0, 0);
-      display.setTextSize(TEXT_SIZE_SMALL);
-      display.println("Zeroing");
-      display.display();
+      zeroingMessage();
       digitalWrite(ledPin,LOW);//LED off
       analogWrite(beepPin, BEEP_OFF);//beep off
+      
     }
 
     //next pulse
