@@ -8,8 +8,8 @@
 //------------------------------------------------------
 //LCD libraries
 #include <Adafruit_GFX.h>
-#include <Adafruit_PCD8544.h>
-#include <JeeLib.h> // Low power functions library
+#include <Adafruit_PCD8544.h> // 84x48 pixel monochrome LCD display
+// #include <JeeLib.h> // Low power functions library (unavailable 2021?)
 //AVR
 #include <avr/io.h>
 #include <avr/power.h>
@@ -45,7 +45,7 @@ const int ain0Pin = 6; //AIN0 pin
 const int ain1Pin = 7; //AIN1 pin
 const int ledPin = 13; //LED pin
 const int beepPin = 11; //beep pin
-const int CLKpin = 3; // PCD Clock
+const int CLKPin = 3; // PCD Clock
 const int DinPin = 4; // PCD Data in
 const int DCPin = 5; // PCD Data/Clock
 const int CEPin = 9; // PCD Chip Select
@@ -87,7 +87,7 @@ boolean zeroing = false;
 unsigned int zero_count = 0;
 int delta = 0;//diff
 
-ISR(WDT_vect) { Sleepy::watchdogEvent(); } // Setup the watchdog
+// drf5n compile w/o jeelib ISR(WDT_vect) { Sleepy::watchdogEvent(); } // Setup the watchdog
 
 boolean target = false;
 
@@ -246,7 +246,8 @@ void loop()
         delay(PAUSE_MS);  
       }
       else {
-        Sleepy::loseSomeTime(PAUSE_MS);
+// compile w/o jeelib       Sleepy::loseSomeTime(PAUSE_MS);
+      delay(PAUSE_MS);
     }
     
     //zeroing pushbutton check
@@ -270,4 +271,3 @@ void loop()
     //next pulse
   }
 }
-
