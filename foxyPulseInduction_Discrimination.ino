@@ -84,6 +84,7 @@ int i;
 int zero = 0;
 int counter;//counter
 float count_avg;
+int descrim; // ADC reading immediately after threshold detection. 
 int btnState = 0;
 boolean zeroing = false;
 unsigned int zero_count = 0;
@@ -95,7 +96,7 @@ int delta = 0;//diff
 
 boolean target = false;
 
-
+// Abstract messaging 
 void zeroingMessage() {
     display.clearDisplay();//LCD clear
     display.display();
@@ -152,9 +153,9 @@ void setup()   {
   //beep
   pinMode(beepPin, OUTPUT);//beep pin -> out
   analogWrite(beepPin, BEEP_OFF);//the duty cycle: between 0 (always off) and 255 (always on)  490 (500) Hz
-  //comparator init
-  pinMode(ain0Pin, INPUT);//AIN0 -> input
-  pinMode(ain1Pin, INPUT);//AIN1 -> input
+  //comparator init D7 is coil, D6 is reference
+  pinMode(ain0Pin, INPUT);//AIN0/D6/6 -> input reference
+  pinMode(ain1Pin, INPUT);//AIN1/D7/7 -> input coil
   ACSR = 0b00000000; // Analog Comparator Control and Status Register 
   ADCSRA = 0b10000000; // ADEN, ADPS = /2
   ADCSRB = 0b00000000; //
@@ -165,7 +166,7 @@ void setup()   {
   target = false;
   display.begin();//LCD init
   displayWelcome();
-  power_adc_disable();//ADC disable
+  //power_adc_disable();//ADC disable
   power_spi_disable();//SPI disable
   power_twi_disable();//Two Wire Interface disable
   power_usart0_disable();//USART0 disable
@@ -204,13 +205,12 @@ void loop()
         zero = count;//new zero value
       }
       zero_count--;//zero counter decrement
+      tone(beepPin,map(zero_count,0,ZERO_COUNTS,2000,200));
       if (zero_count == 0) {
         //beep
         digitalWrite(ledPin,HIGH);//LED on
-        analogWrite(beepPin, BEEP_ON);
         delay(BEEP_MS);
         digitalWrite(ledPin,LOW);//LED off
-        analogWrite(beepPin, BEEP_OFF);
         zeroing = false;//zeroing O.K. 
         counter = 0;//average counter reset
         count_avg = 0;
@@ -223,11 +223,10 @@ void loop()
       //target check
       if (count > (zero+PROTECT)) {
         //target is found!!!
+        descrim=analogRead(ain1Pin);
         target = true;
         digitalWrite(ledPin,HIGH);//LED on
-        analogWrite(beepPin, BEEP_ON);//beep on
-        //delta indication
-        //???
+        tone(beepPin, map(descrim,0,1023,2000,500));//beep on
       }
       else
       {
