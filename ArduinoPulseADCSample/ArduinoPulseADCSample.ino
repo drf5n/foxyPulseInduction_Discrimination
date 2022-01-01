@@ -51,14 +51,16 @@ void setup ()
   // Set the ADC ADPSx prescaler flags to control sampling speed/accuracy
   ADCSRA &= ~(bit (ADPS0) | bit (ADPS1) | bit (ADPS2)); // clear prescaler bits
 
-  //ADCSRA |= bit (ADPS0);                               //   2  
-  //ADCSRA |= bit (ADPS1);                               //   4  
-  //ADCSRA |= bit (ADPS0) | bit (ADPS1);                 //   8  
-  ADCSRA |= bit (ADPS2);                               //  16 
-  //ADCSRA |= bit (ADPS0) | bit (ADPS2);                 //  32 
-  //ADCSRA |= bit (ADPS1) | bit (ADPS2);                 //  64 
-  //ADCSRA |= bit (ADPS0) | bit (ADPS1) | bit (ADPS2);   // 128
-  
+  // sampling rate is [ADC clock] / [prescaler] / [conversion clock cycles]
+  // for Arduino Uno ADC clock is 16 MHz and a conversion takes 13 clock cycles
+  //ADCSRA |= (0b111 << ADPS0); // /128 : 16M/128/13=9615Hz 104us 10 bit
+  //ADCSRA |= (0b110 << ADPS0); // /64 : 16M/64/13=19230Hz 52us 10 bit
+  //ADCSRA |= (0b101 << ADPS0); // /32 : 16M/32/13=38461Hz 26us 10 bit
+  ADCSRA |= (0b100 << ADPS0); // /16 : 16M/16/13=76923Hz 13us 10 bit precision
+  //ADCSRA |= (0b011 << ADPS0); // /8  : 16M/8/13=153.8KHz 6.5us low precision
+  //ADCSRA |= (0b010 << ADPS0); // /4  : 16M/4/13=307.6KHz 3.2us lower precision
+  //ADCSRA |= (0b001 << ADPS0); // /2  : 16M/2/13=615.4Hz 1.6us  bad precision
+
   //enable automatic conversions, start them and interrupt on finish
   ADCSRA |= bit(ADATE) | bit (ADSC) | bit (ADIE); 
   
