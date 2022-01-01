@@ -14,8 +14,8 @@ void help()
     Serial.println("For example: for 2000Hz with 20% duty cycle on and a 30 tick pulse");
     Serial.println ("Starting with 1KHz on pulse & square on D11/OC1A/PB5 & D12/OC1B/PB6\n");
     Serial.print("Send '2000f 20% 30d rh'\n");
-    Serial.print("edge cases are not tested");
-    
+    Serial.print("edge cases are not tested\n\n");
+    Serial.println("Code at https://github.com/drf5n/foxyPulseInduction_Discrimination/blob/discrimination/PulseGenerator/PulseGenerator.ino");
   }
 
 void setup ()
