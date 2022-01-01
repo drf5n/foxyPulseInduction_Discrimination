@@ -11,10 +11,13 @@ const int prescales[] = {0,1,8,64,256,1024};
 
 void help()
   {
-    Serial.println("PulseGenerator.ino (h)elp: Creates variable pulses on pins 11&12 an Arduino Mega");
-    Serial.println("Commands: 0123456789kmpfrw%h");
+    Serial.println("PulseGenerator.ino : Creates variable pulses on pins 11&12 an Arduino Mega");
+    Serial.println("(h)elp:");
+    Serial.println("Commands: 0123456789   kmp f r w % h");
+    Serial.println("(h)elp, (f)requency, (p)eriod, (w)idth, (%) duty cycle, (r)eport");
+    Serial.println("The digits 0-9, (k)ilo, (m)ega  -- These accumulate a number to be acted on by the other commands");
     Serial.println("For example: for 2000Hz with 20% duty cycle on D12/OC1B/PB6 and a 30 tick pulse on D11/OC1A/PB5");
-    Serial.print("Send '2000f 20% 30d rh'\n");
+    Serial.print("Send '2000f 20% 30w rh'\n");
     Serial.print("edge cases are not tested\n\n");
     Serial.println("Code at https://github.com/drf5n/foxyPulseInduction_Discrimination/blob/discrimination/PulseGenerator/PulseGenerator.ino");
   }
@@ -162,15 +165,17 @@ void report (void)
     Serial.print("");
     Serial.println("Timer 1 Configuration");
     Serial.println("TCCR1A TCCR1B ICR1 TCNT1  WGM13:0 OCR1A OCR1B ");
+    Serial.print("0b");
     Serial.print(TCCR1A,BIN);
-    Serial.print(" ");
+    Serial.print(" 0b");
     Serial.print(TCCR1B,BIN);
     Serial.print(" ");
     Serial.print(ICR1);
     Serial.print(" ");
     Serial.print(TCNT1);
     Serial.print(" ");
-    Serial.print((((TCCR1B & (0b11<<WGM12) )>>WGM12)<<2) | (TCCR1B & (0b11<<WGM10)>>WGM10),BIN );
+    // Bit munging to extract and reassemble the WGM13:0 Wave Generation Mode code:
+    Serial.print((((TCCR1B & (0b11<<WGM12) )>>WGM12)<<2) | (TCCR1A & (0b11<<WGM10)>>WGM10),BIN );
     Serial.print(" ");
     Serial.print(OCR1A);
     Serial.print(" ");
