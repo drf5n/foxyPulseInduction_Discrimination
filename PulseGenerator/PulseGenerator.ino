@@ -1,6 +1,8 @@
-// Example of receiving numbers by Serial
-// Author: Nick Gammon
-// Date: 31 March 2012
+// 
+// Arduino Mega pulse generator with CLI.
+// Author: Drf5n
+// Date: 2021-12-31 \
+// Thanks to serial parsing code from Nick Gammon at http://www.gammon.com.au/serial
 
 const char startOfNumberDelimiter = '<';
 const char endOfNumberDelimiter   = '>';
@@ -11,8 +13,7 @@ void help()
   {
     Serial.println("PulseGenerator: Creates variable pulses on pins 11&12 an Arduino Mega");
     Serial.println("Commands: 0123456789kmpfrd%h");
-    Serial.println("For example: for 2000Hz with 20% duty cycle on and a 30 tick pulse");
-    Serial.println ("Starting with 1KHz on pulse & square on D11/OC1A/PB5 & D12/OC1B/PB6\n");
+    Serial.println("For example: for 2000Hz with 20% duty cycle on D12/OC1B/PB6 and a 30 tick pulse on D11/OC1A/PB5");
     Serial.print("Send '2000f 20% 30d rh'\n");
     Serial.print("edge cases are not tested\n\n");
     Serial.println("Code at https://github.com/drf5n/foxyPulseInduction_Discrimination/blob/discrimination/PulseGenerator/PulseGenerator.ino");
