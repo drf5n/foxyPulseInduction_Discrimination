@@ -11,8 +11,8 @@ const int prescales[] = {0,1,8,64,256,1024};
 
 void help()
   {
-    Serial.println("PulseGenerator: Creates variable pulses on pins 11&12 an Arduino Mega");
-    Serial.println("Commands: 0123456789kmpfrd%h");
+    Serial.println("PulseGenerator.ino (h)elp: Creates variable pulses on pins 11&12 an Arduino Mega");
+    Serial.println("Commands: 0123456789kmpfrw%h");
     Serial.println("For example: for 2000Hz with 20% duty cycle on D12/OC1B/PB6 and a 30 tick pulse on D11/OC1A/PB5");
     Serial.print("Send '2000f 20% 30d rh'\n");
     Serial.print("edge cases are not tested\n\n");
@@ -134,9 +134,9 @@ void setPeriod (const unsigned long long period) //
     ;
   }
 
-void setPulse(const unsigned long long duration) // Set the pulse duration
+void setWidth(const unsigned long long duration) // Set the pulse duration
   {
-    Serial.print("(d)uration of pulse len on OC1A set to ");
+    Serial.print("(w)idth of pulse len on OC1A set to ");
     Serial.print((unsigned long) duration);
     Serial.print(" ticks\n");
     OCR1A = duration;
@@ -246,8 +246,8 @@ void processInput ()
        receivedNumber = 0;
        negative = false;
        break;
-    case 'd': // duration
-       setPulse(receivedNumber);
+    case 'w': // width
+       setWidth(receivedNumber);
        receivedNumber=0;
        break;
     case '%':
