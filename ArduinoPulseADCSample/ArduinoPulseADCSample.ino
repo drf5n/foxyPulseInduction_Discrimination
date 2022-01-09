@@ -153,8 +153,13 @@ void loop ()
           Serial.println(samples[numSamples - 1 - ii]);
         }
         break;
-        case 'h':
-        case '?':
+      case ' ':
+      case '\n':
+      case '\r':
+        break;
+      case 'h':
+      case '?':
+      default:
         {
           Serial.println("\nArduinoPulseADCSample.in -- Pulse A1 and read a burst of samples from A0\n"
      "based on serial commands");
@@ -168,7 +173,7 @@ void loop ()
           "h?: Help -- Print this\n"
           );
         }
-      default:
+        break;
         ;;
     }
   }
