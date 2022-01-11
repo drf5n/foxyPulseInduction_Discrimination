@@ -33,7 +33,8 @@ const int numSamples = 500; // sample set
 
 volatile uint16_t samples[numSamples];
 volatile int sample = 0;
-volatile bool burst = 0;
+// volatile bool burst = 0;
+#define BURST (ADCSRA & bit(ADIE)) /* Sampling burst state variable */
 volatile bool pulse = false;
 volatile int adcReading;
 volatile unsigned long sampleEnd;
@@ -71,14 +72,15 @@ ISR (ADC_vect)
 {
   unsigned long now_us;
   // Handle samples
-  if ( burst ) {
+  //if ( burst ) {
     samples[sample++ ] = ADC;
     if (sample >= numSamples)
     {
       sampleEnd = micros();
-      burst = false;
+      ADCSRA &= ~bit(ADIE);  // end of sampling burst so stop interrupting 
+     // burst = false;
     }
-  }
+  //}
   // handle pulse end in sync with reading
   // ...
   if (pulse && ((now_us = micros()) - pulseStart >= pulse_us )) {
@@ -119,7 +121,7 @@ void loop ()
         Serial.println(" V");
         break;
       case 'm':
-        { while (burst); // don't report during burst
+        { while (BURST); // don't report during burst
           unsigned long sampleDuration = sampleEnd - pulseStart;
           unsigned long pulseDuration  = pulseEnd - pulseStart;
 
@@ -145,11 +147,12 @@ void loop ()
         //        pulseEnd = pulseStart + pulse_us;
         *portOutputRegister(digitalPinToPort(pulsePin)) |= digitalPinToBitMask(pulsePin);
         pulse = true;
-        burst = true;
+       // burst = true;
+        ADCSRA |= bit(ADIF)|bit(ADIE); // clear existing ADInterruptFlag and enable ADC Interrupts 
         break;
       case 'D':
       case 'd': {// report Data
-          while (burst);
+          while (BURST);
           sampleDuration = sampleEnd - pulseStart;
           for (int ii = 0 ; ii < numSamples ; ii++) {
           if (c =='D') {
