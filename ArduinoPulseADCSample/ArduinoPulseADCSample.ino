@@ -34,9 +34,10 @@ const int numSamples = 500; // sample set
 volatile uint16_t samples[numSamples];
 volatile int sample = 0;
 volatile bool burst = 0;
+volatile bool pulse = false;
 volatile int adcReading;
-volatile long sampleEnd;
-unsigned long pulseStart, pulseEnd;
+volatile unsigned long sampleEnd;
+volatile unsigned long pulseStart, pulseEnd;
 
 void setup ()
 {
@@ -51,10 +52,10 @@ void setup ()
   // Set the ADC ADPSx prescaler flags to control sampling speed/accuracy
   ADCSRA &= ~(bit (ADPS0) | bit (ADPS1) | bit (ADPS2)); // clear prescaler bits
 
-  //ADCSRA |= bit (ADPS0);                               //   2
-  //ADCSRA |= bit (ADPS1);                               //   4
-  //ADCSRA |= bit (ADPS0) | bit (ADPS1);                 //   8
-  ADCSRA |= bit (ADPS2);                               //  16
+  //ADCSRA |= bit (ADPS0);                               //   2    5 bit, 9us
+  //ADCSRA |= bit (ADPS1);                               //   4    6 bit, 9us
+  //ADCSRA |= bit (ADPS0) | bit (ADPS1);                 //   8    9 bit, 9.19us
+  ADCSRA |= bit (ADPS2);                                 //  16   10 bit, 13us
   //ADCSRA |= bit (ADPS0) | bit (ADPS2);                 //  32
   //ADCSRA |= bit (ADPS1) | bit (ADPS2);                 //  64
   //ADCSRA |= bit (ADPS0) | bit (ADPS1) | bit (ADPS2);   // 128
@@ -68,38 +69,32 @@ void setup ()
 // ADC complete ISR
 ISR (ADC_vect)
 {
-  byte low, high;
-  unsigned long now_us = micros();
-  // we have to read ADCL first; doing so locks both ADCL
-  // and ADCH until ADCH is read.  reading ADCL second would
-  // cause the results of each conversion to be discarded,
-  // as ADCL and ADCH would be locked when it completed.
-  low = ADCL;
-  high = ADCH;
-  adcReading = (high << 8) | low;
-  // handle pulse in sync with reading
-  // ...
-  if ( (*portOutputRegister(digitalPinToPort(pulsePin)) & digitalPinToBitMask(pulsePin))
-       && (now_us - pulseStart >= pulse_us)) {
-    *portOutputRegister(digitalPinToPort(pulsePin)) &= ~digitalPinToBitMask(pulsePin);
-    pulseEnd = now_us;
-  }
-
+  unsigned long now_us;
   // Handle samples
-  if (burst && samples >= 0)
-  {
-    samples[sample--] = adcReading;
-    if (sample < 0)
+  if ( burst ) {
+    samples[sample++ ] = ADC;
+    if (sample >= numSamples)
     {
-      sampleEnd = now_us;
-      burst = 0;
+      sampleEnd = micros();
+      burst = false;
     }
   }
+  // handle pulse end in sync with reading
+  // ...
+  if (pulse && ((now_us = micros()) - pulseStart >= pulse_us )) {
+    *portInputRegister(digitalPinToPort(pulsePin)) = digitalPinToBitMask(pulsePin);
+    pulseEnd = now_us;
+    pulse = false;
+  }
+
 }  // end of ADC_vect
 
 void loop ()
 {
   char c;
+  char buff[80];
+  unsigned long sampleDuration;
+  unsigned long pulseDuration;
   // if last reading finished, process it
 
   // if we aren't taking a reading, start a new one
@@ -124,33 +119,45 @@ void loop ()
         Serial.println(" V");
         break;
       case 'm':
-        Serial.print("# Pulse: ");
-        Serial.print(pulseEnd - pulseStart);
-        Serial.print("us and ");
-        Serial.print(numSamples);
-        Serial.println(" samples.");
-        Serial.print("# Time: ");
-        Serial.print(sampleEnd - pulseStart);
-        Serial.print("us burst of ");
-        Serial.print(numSamples);
-        Serial.print(" samples at ");
-        Serial.print(1.0*(sampleEnd - pulseStart)/numSamples);
-        char buff[80];
-        sprintf(buff," %02d:%02d:%02d ",1,2,3);
-        //Serial.print(buff);
-        Serial.println("us/sample");
-        break;
-        
+        { while (burst); // don't report during burst
+          unsigned long sampleDuration = sampleEnd - pulseStart;
+          unsigned long pulseDuration  = pulseEnd - pulseStart;
+
+          Serial.print("# Pulse: ");
+          Serial.print(pulseDuration);
+          Serial.print("us and ");
+          Serial.print(numSamples);
+          Serial.println(" samples.");
+          Serial.print("# Time: ");
+          Serial.print(sampleDuration);
+          Serial.print("us burst of ");
+          Serial.print(numSamples);
+          Serial.print(" samples at ");
+          Serial.print(1.0 * (unsigned long)(sampleEnd - pulseStart) / numSamples);
+          Serial.println("us/sample");
+          sprintf(buff, " sampleEnd, pulseEnd, pulseStart %02lu : %02lu : %02lu \n", sampleEnd, pulseEnd, pulseStart);
+          Serial.print(buff);
+          break;
+        }
       case 'p': // start pulse
+        sample = 0; 
         pulseStart = micros();
-        pulseEnd = pulseStart + pulse_us;
+        //        pulseEnd = pulseStart + pulse_us;
         *portOutputRegister(digitalPinToPort(pulsePin)) |= digitalPinToBitMask(pulsePin);
-        sample = numSamples - 1;
+        pulse = true;
         burst = true;
         break;
-      case 'd':// report Data
-        for (int ii = 0 ; ii < numSamples ; ii++) {
-          Serial.println(samples[numSamples - 1 - ii]);
+      case 'D':
+      case 'd': {// report Data
+          while (burst);
+          sampleDuration = sampleEnd - pulseStart;
+          for (int ii = 0 ; ii < numSamples ; ii++) {
+          if (c =='D') {
+            Serial.print(ii*sampleDuration/numSamples);
+            Serial.print(' ');
+          }
+            Serial.println(samples[ii]);
+          }
         }
         break;
       case ' ':
@@ -162,16 +169,16 @@ void loop ()
       default:
         {
           Serial.println("\nArduinoPulseADCSample.in -- Pulse A1 and read a burst of samples from A0\n"
-     "based on serial commands");
+                         "based on serial commands");
           Serial.println("# https://github.com/drf5n/foxyPulseInduction_Discrimination/tree/discrimination/ArduinoPulseADCSample\nCommands: [vcsrpdm] ?");
           Serial.println("Commands:\n"
-          "p: Pulse -- Start a pulse cycle on A1 and record data on A0\n"
-          "d: Data -- Dump the data from the last pulse\n"
-          "m: Metadata -- Print the lenght of pulse, number of samples and rate\n"
-          "v: Voltage -- Conver voltage on A0\n"
-          "c: Convering -- show ADCSSRA register\n"
-          "h?: Help -- Print this\n"
-          );
+                         "p: Pulse -- Start a pulse cycle on A1 and record data on A0\n"
+                         "d,D: Data -- Dump the data from the last pulse\n"
+                         "m: Metadata -- Print the length of pulse, number of samples and rate\n"
+                         "v: Voltage -- Conver voltage on A0\n"
+                         "c: Converting? -- show ADCSSRA register\n"
+                         "h?: Help -- Print this\n"
+                        );
         }
         break;
         ;;
