@@ -27,19 +27,17 @@
 const byte adcPin = 0; // A0 -- Pin to read ADC data from
 const byte pulsePin = A1; // Next to A0 -- pin to pulse
 const byte oneshot_pin = 12; // OC1B pin on Mega, controlled by Timer1
-const int pulse_us = 1000; // pulse duration
-const int numSamples = 500; // sample set
+const int pulse_us = 20; // pulse duration
+const int numSamples = 20; // sample set
 // Change the sampling speed with the prescaler config in setup()
 
 
 volatile uint16_t samples[numSamples];
-volatile int sample = 0;
-// volatile bool burst = 0;
+volatile int sample = 0;    // position in sample state variable
 #define BURST (ADCSRA & bit(ADIE)) /* Sampling burst state variable */
-volatile bool pulse = false;
-volatile int adcReading;
-volatile unsigned long sampleEnd;
-volatile unsigned long pulseStart, pulseEnd;
+int adcReading;
+unsigned long sampleEnd;
+unsigned long pulseStart, pulseEnd;
 
 
 
@@ -51,7 +49,8 @@ volatile unsigned long pulseStart, pulseEnd;
 // Setup the one-shot pulse generator and initialize with a pulse width that is (cycles) clock counts long
 #define OSP_SET_WIDTH(cycles) (OCR1B = 0xffff-(cycles-1))
 void osp_setup(uint16_t cycles) { // 1 idles, 0xffff never matches, 2-0xfffe makes pulses
-  const byte prescaler = 0b010; // 0b001: /1,      16MHz, 62.5ns resolution, 4ms max 
+  const byte prescaler = 0b010; // Choose /8 for 0.5us resolution
+                                // 0b001: /1,      16MHz, 62.5ns resolution, 4ms max 
                                 // 0b010: /8,       2MHz,  0.5us resolution, 32ms max
                                 // 0b011: /64,    250kHz,  4us  resolution, 263ms max
                                 // 0b100: /256,  62.5kHz  16us  resolution, 1.048s max 
@@ -102,13 +101,13 @@ void adc_setup_freerunning(const byte adcPin){
   // Set the ADC ADPSx prescaler flags to control sampling speed/accuracy
   ADCSRA &= ~(bit (ADPS0) | bit (ADPS1) | bit (ADPS2)); // clear prescaler bits
 
-  //ADCSRA |= bit (ADPS0);                               //   2    5 bit, 9.7us
-  //ADCSRA |= bit (ADPS1);                               //   4    6 bit, 9.7us
-  //ADCSRA |= bit (ADPS0) | bit (ADPS1);                 //   8    9 bit, 9.7us
-  ADCSRA |= bit (ADPS2);                                 //  16   10 bit, 13us
-  //ADCSRA |= bit (ADPS0) | bit (ADPS2);                 //  32     10 bit, 26us
-  //ADCSRA |= bit (ADPS1) | bit (ADPS2);                 //  64     10 bit, 52us
-  //ADCSRA |= bit (ADPS0) | bit (ADPS1) | bit (ADPS2);   // 128     10 bit, 104us
+  //ADCSRA |= 0b001 << ADPS0;   //   2    5 bit, 
+  //ADCSRA |= 0b010 << ADPS0;   //   4    6 bit, 5.36us
+  //ADCSRA |= 0b011 << ADPS0;   //   8    9 bit, 6.51us
+  ADCSRA |= 0b100 << ADPS0;   //  16   10 bit, 13us
+  //ADCSRA |= 0b101 << ADPS0;   //  32     10 bit, 26us
+  //ADCSRA |= 0b110 << ADPS0;   //  64     10 bit, 52us
+  //ADCSRA |= 0b111 << ADPS0;   // 128     10 bit, 104us
 
   //enable automatic conversions, start them and interrupt on finish
   ADCSRA |= bit(ADATE) | bit (ADSC) | bit (ADIE);
@@ -118,39 +117,24 @@ void adc_setup_freerunning(const byte adcPin){
 void setup ()
 {
   Serial.begin (115200);
-  pinMode(pulsePin, OUTPUT);
+  //pinMode(pulsePin, OUTPUT);
   osp_setup(); // Config Mega Digital 12 for oneshot output
   adc_setup_freerunning(adcPin);
 
 }  // end of setup
 
 // ADC complete ISR
-ISR (ADC_vect)
+ISR (ADC_vect)  // Store ADC burst values
 {
-  unsigned long now_us;
   // Handle samples
-  //if ( burst ) {
-  samples[sample++ ] = ADC;
-  if (sample >= numSamples)
-  {
-    sampleEnd = micros();
-    ADCSRA &= ~bit(ADIE);  // end of sampling burst so stop interrupting
-    // burst = false;
-  }
+  samples[sample ] = ADC;
+  //if ( sample == 0){
+   // OSP_SET_AND_FIRE(pulse_us * 2); // 
   //}
-  // handle pulse in sync with reading
-  // ...
-  if (sample == 1){
-    *portOutputRegister(digitalPinToPort(pulsePin)) = digitalPinToBitMask(pulsePin);
-    OSP_SET_AND_FIRE(pulse_us * 2); // 
+  if (++sample >= numSamples) // watch off-by-one
+  {
+    ADCSRA &= ~bit(ADIE);  // end of sampling burst so stop interrupting
   }
-  if (pulse && ((now_us = micros()) - pulseStart >= pulse_us )) {
-    *portInputRegister(digitalPinToPort(pulsePin)) = digitalPinToBitMask(pulsePin);
-    pulseEnd = now_us;
-    pulse = false;
-  }
-  
-
 }  // end of ADC_vect
 
 void loop ()
@@ -177,13 +161,14 @@ void loop ()
         ADCSRA |= bit (ADSC) | bit (ADIE);
         break;
       case 'v':
+        adcReading = ADC;
         Serial.print(adcReading);
         Serial.print(' ');
         Serial.print((0.5 + adcReading) * 5.0 / 1024, 4);
         Serial.println(" V");
         break;
       case 'm':
-        { while (BURST); // don't report during burst
+        { 
           unsigned long sampleDuration = sampleEnd - pulseStart;
           unsigned long pulseDuration  = pulseEnd - pulseStart;
 
@@ -204,17 +189,16 @@ void loop ()
           break;
         }
       case 'p': // start pulse
-        sample = 0;
+        sample = 0;  // reset sample SV
         pulseStart = micros();
-        //        pulseEnd = pulseStart + pulse_us;
-        *portOutputRegister(digitalPinToPort(pulsePin)) |= digitalPinToBitMask(pulsePin);
-        pulse = true;
-        // burst = true;
+        OSP_SET_AND_FIRE(pulse_us * 2); // pulse outside ISR
         ADCSRA |= bit(ADIF) | bit(ADIE); // clear existing ADInterruptFlag and enable ADC Interrupts
+        while(BURST); // block until burst done
+        sampleEnd = micros(); // Record times
+        pulseEnd = pulseStart + pulse_us;
         break;
       case 'D':
       case 'd': {// report Data
-          while (BURST);
           sampleDuration = sampleEnd - pulseStart;
           for (int ii = 0 ; ii < numSamples ; ii++) {
             if (c == 'D') {
