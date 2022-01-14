@@ -110,7 +110,8 @@ void adc_setup_freerunning(const byte adcPin){
   //ADCSRA |= 0b111 << ADPS0;   // 128     10 bit, 104us
 
   //enable automatic conversions, start them and interrupt on finish
-  ADCSRA |= bit(ADATE) | bit (ADSC) | bit (ADIE);
+  //ADCSRA |= bit(ADATE) | bit (ADSC) | bit (ADIE);
+    ADCSRA |= bit(ADATE) | bit (ADSC) ;
 
 }
 
@@ -126,15 +127,16 @@ void setup ()
 // ADC complete ISR
 ISR (ADC_vect)  // Store ADC burst values
 {
+  if (sample >= numSamples) // watch off-by-one
+  {
+    ADCSRA &= ~bit(ADIE);  // end of sampling burst so stop interrupting
+    return;
+  }
   // Handle samples
-  samples[sample ] = ADC;
+  samples[sample++ ] = ADC;
   //if ( sample == 0){
    // OSP_SET_AND_FIRE(pulse_us * 2); // 
   //}
-  if (++sample >= numSamples) // watch off-by-one
-  {
-    ADCSRA &= ~bit(ADIE);  // end of sampling burst so stop interrupting
-  }
 }  // end of ADC_vect
 
 void loop ()
