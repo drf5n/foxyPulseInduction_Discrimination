@@ -27,7 +27,7 @@
 const byte adcPin = 0; // A0 -- Pin to read ADC data from
 const byte pulsePin = A1; // Next to A0 -- pin to pulse
 const byte oneshot_pin = 12; // OC1B pin on Mega, controlled by Timer1
-const int pulse_us = 20; // pulse duration
+const int pulse_us = 50; // pulse duration
 const int numSamples = 20; // sample set
 // Change the sampling speed with the prescaler config in setup()
 
@@ -152,9 +152,13 @@ void loop ()
   if (Serial.available()) {
     c = Serial.read();
     switch (c) {
-      case 'c': // Converting?
-        Serial.print("ADCSRA: ");
-        Serial.println(ADCSRA, BIN);
+      case 'c': // Configurationo?
+        Serial.print("ADCSRA: 0b");
+        Serial.print(ADCSRA, BIN);
+        Serial.print(" ADCSRB: 0b");
+        Serial.print(ADCSRB, BIN);
+        Serial.print(" ADMUX: 0b");
+        Serial.println(ADMUX, BIN);
         break;
       case 's': // stop conversions
         ADCSRA &= ~(bit (ADSC) | bit (ADIE));
@@ -164,8 +168,9 @@ void loop ()
         break;
       case 'v':
         adcReading = ADC;
+        Serial.print("ADC ");
         Serial.print(adcReading);
-        Serial.print(' ');
+        Serial.print(" counts, ");
         Serial.print((0.5 + adcReading) * 5.0 / 1024, 4);
         Serial.println(" V");
         break;
@@ -186,7 +191,7 @@ void loop ()
           Serial.print(" samples at ");
           Serial.print(1.0 * (unsigned long)(sampleEnd - pulseStart) / numSamples);
           Serial.println("us/sample");
-          sprintf(buff, " sampleEnd, pulseEnd, pulseStart %02lu : %02lu : %02lu \n", sampleEnd, pulseEnd, pulseStart);
+          sprintf(buff, "# sampleEnd, pulseEnd, pulseStart %02lu : %02lu : %02lu \n", sampleEnd, pulseEnd, pulseStart);
           Serial.print(buff);
           break;
         }
@@ -226,8 +231,8 @@ void loop ()
                          "p: Pulse -- Start a pulse cycle on A1 and record data on A0\n"
                          "d,D: Data -- Dump the data from the last pulse\n"
                          "m: Metadata -- Print the length of pulse, number of samples and rate\n"
-                         "v: Voltage -- Conver voltage on A0\n"
-                         "c: Converting? -- show ADCSSRA register\n"
+                         "v: Voltage -- Convert voltage on A0\n"
+                         "c: Converting? -- show ADCSRA register\n"
                          "h?: Help -- Print this\n"
                         );
         }
