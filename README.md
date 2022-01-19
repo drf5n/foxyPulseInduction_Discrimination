@@ -16,6 +16,8 @@ Portions forked from https://github.com/Dreamy16101976/foxyPIv1
 # ToDo:
 
 * Use high rate ADC (76.9kHz/13us) to get multiple measurements per pulse-decay cycle (per https://www.gammon.com.au/adc)
+** See [ArduinoPulseADCSample](ArduinoPulseADCSample/) for code
 * Adapt a circuit
+** See the circuits at https://hackaday.io/project/179588-pulse-induction-metal-detector/log/192567-modelling-the-flip-coil
 * Fit decay curve to ADC samples to find threshold, decay rate, and floor
 
