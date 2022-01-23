@@ -19,16 +19,23 @@
 //  *  Write p to emit a pulse and record a burst of values
 //  *  Write d to see the data recorded during the burst (compatible with SerialPlotter)
 //  *  Write m to see metadata about the sample size and interval
+//  *  Write a to analyze the decay curve
 //
-//  Loopback test with a jumper or RC network between A1 and A2.
+//  Loopback test with a jumper or RC network between 12, A0.\
 //
-
+//  I tested with an 100ohm resistor and diode from 12 to
+//  A0 with a 1uF cap to Ground:  
+//
+//   D12>-+----100R------+--A0
+//        +---|>|--------+
+//   GND>-------|C1uF|---+
+//
 // Configurables:
 const byte adcPin = 0; // A0 -- Pin to read ADC data from
-const byte pulsePin = A1; // Next to A0 -- pin to pulse
+//const byte pulsePin = A1; // Next to A0 -- pin to pulse.  ** Use oneshot_pin instead
 const byte oneshot_pin = 12; // OC1B pin on Mega, controlled by Timer1
-const int pulse_us = 50; // pulse duration
-const int numSamples = 20; // sample set
+const int pulse_us = 100; // pulse duration
+const int numSamples = 200; // sample set
 // Change the sampling speed with the prescaler config in setup()
 
 
@@ -38,8 +45,7 @@ volatile int sample = 0;    // position in sample state variable
 int adcReading;
 unsigned long sampleEnd;
 unsigned long pulseStart, pulseEnd;
-
-
+char buff[128];
 
 // ########## Timer1 One-shot functions
 // The one shot pulses are output on Digital pin OC1B (Arduino Uno D10, Mega D12, Nano D3)
@@ -103,8 +109,8 @@ void adc_setup_freerunning(const byte adcPin){
 
   //ADCSRA |= 0b001 << ADPS0;   //   2    5 bit, 
   //ADCSRA |= 0b010 << ADPS0;   //   4    6 bit, 5.36us
-  //ADCSRA |= 0b011 << ADPS0;   //   8    9 bit, 6.51us
-  ADCSRA |= 0b100 << ADPS0;   //  16   10 bit, 13us
+  ADCSRA |= 0b011 << ADPS0;   //   8    9 bit, 6.51us
+  //ADCSRA |= 0b100 << ADPS0;   //  16   10 bit, 13us
   //ADCSRA |= 0b101 << ADPS0;   //  32     10 bit, 26us
   //ADCSRA |= 0b110 << ADPS0;   //  64     10 bit, 52us
   //ADCSRA |= 0b111 << ADPS0;   // 128     10 bit, 104us
@@ -216,6 +222,9 @@ void loop ()
           }
         }
         break;
+      case 'a': // analyze
+         analyze_data();
+         break;
       case ' ':
       case '\n':
       case '\r':
@@ -231,8 +240,9 @@ void loop ()
                          "p: Pulse -- Start a pulse cycle on A1 and record data on A0\n"
                          "d,D: Data -- Dump the data from the last pulse\n"
                          "m: Metadata -- Print the length of pulse, number of samples and rate\n"
+                         "a: Analyze -- Analyze the portion after the pulse as time constants.\n"
                          "v: Voltage -- Convert voltage on A0\n"
-                         "c: Converting? -- show ADCSRA register\n"
+                         "c: Configuration? -- show ADCSRA, ADCSRB, ADMUX registers\n"
                          "h?: Help -- Print this\n"
                         );
         }
@@ -244,3 +254,93 @@ void loop ()
   // do other stuff here
 
 }  // end of loop
+
+void analyze_data(void)
+{
+  unsigned long sampleDuration = sampleEnd - pulseStart;
+  unsigned long pulseDuration  = pulseEnd - pulseStart;
+  int range;
+  int ii_max = 0;
+  int ii_min = 0;
+  int ii,min_lev,max_lev;
+  int ii_tc1,ii_tc2,ii_tc3,ii_tc4,ii_tc5; 
+  int tc1_lev,tc2_lev,tc3_lev, tc4_lev, tc5_lev;
+  float dt_us;
+
+  dt_us = (float)sampleDuration /numSamples;
+  for(ii = 0; ii<numSamples; ii++){
+    // last max:
+    if(samples[ii] >= samples[ii_max]) { ii_max =ii;} 
+    // first min
+//    if(samples[ii] < samples[ii_min]) { ii_max =ii;}
+  }
+
+   ii_min = ii_max;
+  for(ii = ii_max; ii<numSamples; ii++){
+    // first min after max
+    if(samples[ii] < samples[ii_min]) { ii_min = ii;}
+  }
+  
+  min_lev = samples[ii_min];
+  max_lev = samples[ii_max];
+  range = max_lev - min_lev;
+  // Scan for time constants
+  tc1_lev = 368L * range / 1000 + min_lev;
+  tc2_lev = 135L * range / 1000 + min_lev;
+  tc3_lev =  50L * range / 1000 + min_lev;
+  tc4_lev =  18L * range / 1000 + min_lev;
+  tc5_lev =   7L * range / 1000 + min_lev;
+
+  sprintf(buff,"Max/min: %d/%d Range %d, Time Constant Levels :"
+               "%d %d %d %d %d\n",
+                max_lev,min_lev,range,
+                tc1_lev,tc2_lev, tc3_lev,tc4_lev,tc5_lev);
+  Serial.print(buff);
+
+  for(ii = ii_max; ii<numSamples; ii++){
+    // first last X after max
+    if(samples[ii] > tc1_lev) { ii_tc1 = ii;}
+    if(samples[ii] > tc2_lev) { ii_tc2 = ii;}
+    if(samples[ii] > tc3_lev) { ii_tc3 = ii;}
+    if(samples[ii] > tc4_lev) { ii_tc4 = ii;}
+    if(samples[ii] > tc5_lev) { ii_tc5 = ii;}
+  }
+   
+ 
+  sprintf(buff,"%d: %d %d: %d   %d: %d  %d: %d  %d: %d  %d: %d  %d: %d\n",
+          ii_max,max_lev,
+          ii_min,min_lev,
+          ii_tc1,samples[ii_tc1],
+          ii_tc2,samples[ii_tc2],
+          ii_tc3,samples[ii_tc3],
+          ii_tc4,samples[ii_tc4],
+          ii_tc5,samples[ii_tc5]
+          );
+  Serial.print(buff);
+
+  float tc1_us = ((float)ii_tc1 - ii_max) * dt_us;
+  float R = 100;
+  float C = tc1_us /R; // uF
+  float L =  R/(tc1_us );  // uH
+  
+  Serial.print("TC_1: ");
+  Serial.print(tc1_us);
+  Serial.print("us ");
+  Serial.print("us TC_2: "); Serial.print(dt_us*(ii_tc2-ii_tc1));
+  Serial.print("us TC_3: "); Serial.print(dt_us*(ii_tc3-ii_tc2));
+  Serial.print("us TC_4: "); Serial.print(dt_us*(ii_tc4-ii_tc3));
+  Serial.print("us TC_5: "); Serial.print(dt_us*(ii_tc5-ii_tc4));
+  Serial.print("us. \nW 100 Ohm: C_1: ");
+  Serial.print(C);
+  
+  Serial.print("uF or L_1: ");
+  Serial.print(L);
+  Serial.print("uH ");
+  Serial.println();
+
+
+  
+  
+  
+  
+}
