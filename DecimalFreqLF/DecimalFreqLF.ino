@@ -1,5 +1,11 @@
 // DecimalFreqLF.ino -- based on DecimalFreqLF.c from https://www.romanblack.com/onesec/High_Acc_Timing.htm#decfreq
-// Adapted to Arduino
+//  DecimalFreqLF.c  Generates exact decimal frequency on a PIC using any xtal.
+//  Copyright; Sep 2012 Roman Black
+//  Compiler; MikroC or MikroC PRO
+//  Open source; use it for whatever you like, but please mention me as the
+//  original author and mention my web page; www.RomanBlack.com/High_Acc_Timing.htm
+//
+// Adapted to Arduino from DecimalFreqLF.c by David Forrest, 2022-01-08
 // This uses the bresenham slope algorithm to keep track of the unused remainders 
 // between millihertz cycles and timer interrupts with the reaminder left in 'accum'
 //
